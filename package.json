@@ -1,0 +1,33 @@
+{
+  "name": "onetask-ai-hr-assistant",
+  "version": "1.0.0",
+  "description": "AI HR Assistant with RAG Pipeline, Grounded Q&A, Document Management & Role-Based Access",
+  "main": "server/src/index.ts",
+  "scripts": {
+    "server": "tsx server/src/index.ts",
+    "server:dev": "nodemon --watch server/src --exec tsx server/src/index.ts",
+    "client": "npm --prefix client run dev",
+    "dev": "npx --package concurrently concurrently \"npm run server\" \"npm run client\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mammoth": "^1.9.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.10",
+    "@types/pdf-parse": "^1.1.4",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^9.2.4",
+    "nodemon": "^3.1.9",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
