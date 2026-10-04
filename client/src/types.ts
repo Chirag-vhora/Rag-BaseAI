@@ -30,6 +30,8 @@ export interface ChatMessage {
   sources?: SourceReference[];
   userRole?: UserRole;
   isUngrounded?: boolean;
+  /** Set when the primary LLM was unavailable and a fallback answered. */
+  fallbackNote?: string;
 }
 
 export interface VectorStats {

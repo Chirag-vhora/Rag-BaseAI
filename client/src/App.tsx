@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { ChatInterface } from './components/ChatInterface';
 import { DocumentManager } from './components/DocumentManager';
 import { HistorySidebar } from './components/HistorySidebar';
+import { AmbientBackground } from './components/AmbientBackground';
 
 export const App: React.FC = () => {
   const [activeRole, setActiveRole] = useState<UserRole>('employee');
@@ -72,8 +73,11 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      
+    <div className="relative min-h-screen text-slate-100 flex flex-col font-sans overflow-x-hidden">
+
+      {/* Liquid aurora backdrop (presentational only) */}
+      <AmbientBackground />
+
       {/* Top Navbar Header */}
       <Header
         activeRole={activeRole}
@@ -86,10 +90,10 @@ export const App: React.FC = () => {
 
       {/* Main Workspace Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 space-y-6">
-        
+
         {activeTab === 'chat' ? (
           <div className="flex flex-col lg:flex-row gap-6 items-start">
-            <div className="flex-1 w-full min-w-0">
+            <div className="flex-1 w-full min-w-0 fade-up">
               <ChatInterface
                 messages={messages}
                 onSendMessage={handleSendMessage}
@@ -98,26 +102,36 @@ export const App: React.FC = () => {
               />
             </div>
 
-            <HistorySidebar
-              activeRole={activeRole}
-              onSelectPrompt={handleSelectPrompt}
-              onClearHistory={handleClearHistory}
-              messageCount={messages.length}
-            />
+            <div className="w-full lg:w-80 shrink-0 fade-up delay-2">
+              <HistorySidebar
+                activeRole={activeRole}
+                onSelectPrompt={handleSelectPrompt}
+                onClearHistory={handleClearHistory}
+                messageCount={messages.length}
+              />
+            </div>
           </div>
         ) : (
-          <DocumentManager
-            documents={documents}
-            onRefresh={loadDocuments}
-            activeRole={activeRole}
-          />
+          <div className="fade-up">
+            <DocumentManager
+              documents={documents}
+              onRefresh={loadDocuments}
+              activeRole={activeRole}
+            />
+          </div>
         )}
 
       </main>
 
       {/* Footer */}
-      <footer className="py-4 border-t border-slate-800/80 text-center text-xs text-slate-500">
-        NexusHR Assistant • AI HR Assistant Technical Assessment • RAG Pipeline + Role-Based Access Control
+      <footer className="relative py-5 mt-4 border-t border-white/10 text-center text-xs">
+        <p className="text-slate-400">
+          <span className="text-aurora font-semibold">NexusHR Assistant</span>
+          <span className="mx-2 text-slate-600">•</span>
+          AI HR Assistant Technical Assessment
+          <span className="mx-2 text-slate-600">•</span>
+          RAG Pipeline + Role-Based Access Control
+        </p>
       </footer>
 
     </div>

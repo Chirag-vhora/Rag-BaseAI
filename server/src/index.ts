@@ -41,8 +41,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Seed initial sample documents for evaluation readiness
 try {
-  seedSampleDocuments();
-  console.log('✅ Initial company HR policies seeded into RAG vector store successfully.');
+  const { seeded } = seedSampleDocuments();
+  if (seeded.length > 0) {
+    console.log(`✅ Initial company HR policies seeded into RAG vector store successfully.`);
+  } else {
+    console.log('✅ Company HR policies already seeded (vector store ready).');
+  }
 } catch (err) {
   console.warn('⚠️ Could not seed sample documents on boot:', err);
 }

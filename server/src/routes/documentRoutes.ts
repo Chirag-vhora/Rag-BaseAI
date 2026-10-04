@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { extractTextFromBuffer } from '../services/documentParser';
 import { chunkText } from '../services/chunker';
 import { vectorStore } from '../services/vectorStore';
+import { pineconeStore } from '../services/pineconeStore';
+import { getBatchGeminiEmbeddings } from '../services/geminiEmbeddings';
 import { seedSampleDocuments } from '../services/sampleDocs';
 import { DocumentMetadata, UserRole } from '../types';
 
@@ -12,6 +14,24 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
+
+/**
+ * Helper — upsert chunks to Pinecone if configured
+ */
+async function tryUpsertToPinecone(chunks: any[]): Promise<void> {
+  const geminiKey = process.env.GEMINI_API_KEY;
+
+  if (!pineconeStore.isConfigured() || !geminiKey) {
+    return; // Silently skip — Pinecone not configured
+  }
+
+  if (chunks.length === 0) return;
+
+  const texts = chunks.map((c) => c.content);
+  const embeddings = await getBatchGeminiEmbeddings(texts, geminiKey);
+  await pineconeStore.upsertChunks(chunks, embeddings);
+  console.log(`🌲 Upserted ${chunks.length} chunks to Pinecone`);
+}
 
 /**
  * GET /api/documents - List all uploaded documents
@@ -23,7 +43,8 @@ router.get('/', (req: Request, res: Response) => {
     res.json({
       success: true,
       documents: docs,
-      stats
+      stats,
+      vectorEngine: pineconeStore.isConfigured() ? 'pinecone' : 'local-tfidf'
     });
   } catch (error) {
     res.status(500).json({ success: false, message: (error as Error).message });
@@ -60,7 +81,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 
     vectorStore.saveDocumentMetadata(docMeta);
 
-    // Extract text asynchronously
+    // Extract text
     const text = await extractTextFromBuffer(buffer, mimetype, originalname);
 
     if (!text || text.trim().length === 0) {
@@ -76,8 +97,15 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       category
     });
 
-    // Update vector store
+    // Always store in local store (serves as fallback + metadata registry)
     vectorStore.addChunks(chunks);
+
+    // If Pinecone is configured, generate Gemini embeddings and upsert
+    try {
+      await tryUpsertToPinecone(chunks);
+    } catch (embeddingErr) {
+      console.warn('Pinecone upsert failed (will serve from local TF-IDF store):', embeddingErr);
+    }
 
     // Update metadata to ready
     docMeta.status = 'indexed';
@@ -87,7 +115,8 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     res.status(201).json({
       success: true,
       message: `Successfully uploaded and indexed ${originalname}`,
-      document: docMeta
+      document: docMeta,
+      vectorEngine: pineconeStore.isConfigured() ? 'pinecone' : 'local-tfidf'
     });
   } catch (error) {
     console.error('Upload processing error:', error);
@@ -101,18 +130,28 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 /**
  * POST /api/documents/seed - Seed sample company policy suite
  */
-router.post('/seed', (req: Request, res: Response) => {
+router.post('/seed', async (req: Request, res: Response) => {
   try {
-    const seeded = seedSampleDocuments();
+    const { seeded, chunks } = await seedSampleDocuments();
     const docs = vectorStore.getAllDocuments();
     const stats = vectorStore.getStats();
+
+    // Upsert seeded chunks to Pinecone if configured
+    if (chunks.length > 0) {
+      try {
+        await tryUpsertToPinecone(chunks);
+      } catch (err) {
+        console.warn('Pinecone upsert for seed docs failed:', err);
+      }
+    }
 
     res.json({
       success: true,
       message: `Seeded ${seeded.length} sample policy documents`,
       seededCount: seeded.length,
       documents: docs,
-      stats
+      stats,
+      vectorEngine: pineconeStore.isConfigured() ? 'pinecone' : 'local-tfidf'
     });
   } catch (error) {
     res.status(500).json({ success: false, message: (error as Error).message });
@@ -122,13 +161,23 @@ router.post('/seed', (req: Request, res: Response) => {
 /**
  * DELETE /api/documents/:id - Delete document and purge vectors
  */
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id); // Express 5 typings allow string[]
     const deleted = vectorStore.deleteDocument(id);
 
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    // Also purge from Pinecone if configured
+    if (pineconeStore.isConfigured()) {
+      try {
+        await pineconeStore.deleteDocument(id);
+        console.log(`🌲 Deleted document ${id} from Pinecone`);
+      } catch (err) {
+        console.warn('Pinecone deletion failed:', err);
+      }
     }
 
     res.json({

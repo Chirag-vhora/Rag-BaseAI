@@ -2,51 +2,574 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   NEXUSHBR — AURORA GLASS DESIGN SYSTEM
+   Liquid flowing glassmorphism • restrained premium motion
+   ============================================================ */
+
+:root {
+  --aurora-bg: #05070f;
+  --aurora-1: rgba(99, 102, 241, 0.55); /* indigo  */
+  --aurora-2: rgba(139, 92, 246, 0.45); /* violet  */
+  --aurora-3: rgba(34, 211, 238, 0.38); /* cyan    */
+  --aurora-4: rgba(16, 185, 129, 0.30); /* emerald */
+
+  /* SOLID surface palette (deep navy) — 95% opaque so the aurora
+     only faintly tints panels instead of washing them out. */
+  --surface-1: rgba(14, 18, 37, 0.95); /* base panel   */
+  --surface-2: rgba(21, 26, 48, 0.95); /* raised card  */
+  --surface-3: rgba(27, 33, 64, 0.95); /* hover / well */
+  --surface-4: rgba(9, 12, 26, 0.95);  /* inset well   */
+
+  --solid-indigo: #4f46e5;
+  --solid-indigo-hi: #6366f1;
+  --solid-cyan: #0891b2;
+  --solid-emerald: #059669;
+  --solid-emerald-hi: #10b981;
+  --solid-violet: #7c3aed;
+  --solid-amber: #b45309;
+  --solid-red: #9f1239;
+
+  --glass-line: rgba(255, 255, 255, 0.10);
+  --glass-line-soft: rgba(255, 255, 255, 0.07);
+}
+
 @layer base {
+  html {
+    background-color: var(--aurora-bg);
+    scroll-behavior: smooth;
+  }
+
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background-color: #0f172a;
+    background-color: transparent;
     color: #f8fafc;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Display face for headings — Sora loads from index.html */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: rgba(99, 102, 241, 0.45);
+    color: #fff;
   }
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* All component classes live in Tailwind's `components` layer so that any
+   utility class used in the markup always wins, keeping overrides predictable. */
+@layer components {
+
+/* ------------------------------------------------------------
+   1. LIQUID AURORA BACKGROUND
+   ------------------------------------------------------------ */
+.aurora-shell {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(99, 102, 241, 0.16), transparent 60%),
+    radial-gradient(100% 80% at 100% 100%, rgba(34, 211, 238, 0.10), transparent 60%),
+    var(--aurora-bg);
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+/* Soft flowing liquid orbs */
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.75;
+  will-change: transform;
+  animation: liquid-drift 34s ease-in-out infinite;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.8);
-  border-radius: 9999px;
+.aurora-orb-1 {
+  width: 46vw; height: 46vw; min-width: 380px; min-height: 380px;
+  top: -14vw; left: -10vw;
+  background: radial-gradient(circle at 35% 35%, var(--aurora-1), transparent 68%);
+  animation-duration: 38s;
+}
+.aurora-orb-2 {
+  width: 40vw; height: 40vw; min-width: 340px; min-height: 340px;
+  top: 22vh; right: -12vw;
+  background: radial-gradient(circle at 60% 40%, var(--aurora-2), transparent 68%);
+  animation-duration: 44s;
+  animation-delay: -8s;
+}
+.aurora-orb-3 {
+  width: 44vw; height: 44vw; min-width: 360px; min-height: 360px;
+  bottom: -18vw; left: 24vw;
+  background: radial-gradient(circle at 50% 50%, var(--aurora-3), transparent 70%);
+  animation-duration: 50s;
+  animation-delay: -16s;
+}
+.aurora-orb-4 {
+  width: 30vw; height: 30vw; min-width: 280px; min-height: 280px;
+  top: 55%; left: -8vw;
+  background: radial-gradient(circle at 50% 50%, var(--aurora-4), transparent 70%);
+  animation-duration: 46s;
+  animation-delay: -24s;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 1);
+/* Faint engineering grid + vignette for depth */
+.aurora-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
 }
 
-/* Glassmorphism panel style */
+.aurora-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 100% at 50% 40%, transparent 45%, rgba(5, 7, 15, 0.75) 100%);
+}
+
+/* Soft 3D accent floating inside the backdrop */
+.aurora-cube-scene {
+  position: absolute;
+  right: 6%;
+  top: 58%;
+  width: 240px;
+  height: 240px;
+  perspective: 900px;
+  opacity: 0.32;
+}
+
+.aurora-cube {
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: cube-turn 90s linear infinite;
+}
+
+.aurora-cube__face {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(165, 243, 252, 0.35);
+  background-color: rgba(79, 70, 229, 0.16);
+  box-shadow: inset 0 0 60px rgba(165, 243, 252, 0.12);
+}
+
+.aurora-cube__face--front  { transform: translateZ(120px); }
+.aurora-cube__face--back   { transform: rotateY(180deg) translateZ(120px); }
+.aurora-cube__face--right  { transform: rotateY(90deg) translateZ(120px); }
+.aurora-cube__face--left   { transform: rotateY(-90deg) translateZ(120px); }
+.aurora-cube__face--top    { transform: rotateX(90deg) translateZ(120px); }
+.aurora-cube__face--bottom { transform: rotateX(-90deg) translateZ(120px); }
+
+/* ------------------------------------------------------------
+   2. GLASSMORPHISM PANELS
+   ------------------------------------------------------------ */
 .glass-panel {
-  background: rgba(30, 41, 59, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  isolation: isolate;
+  background: var(--surface-1);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid var(--glass-line);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+    0 22px 48px -26px rgba(0, 0, 0, 0.95);
+}
+
+/* Top-edge light sweep — the "liquid glass" highlight.
+   z-index:-1 keeps it above the panel fill but behind all content. */
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.10), transparent 34%);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .glass-card {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  background: var(--surface-2);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid var(--glass-line-soft);
+  box-shadow: 0 12px 30px -22px rgba(0, 0, 0, 0.95);
 }
 
-/* Pulse glow effects */
+/* SOLID high-contrast accent rim (no gradient) — a crisp indigo outline
+   plus a soft outer glow so it pops against the deep-navy panels. */
+.glass-rim {
+  border: 1px solid var(--solid-indigo-hi);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+    0 0 0 1px rgba(99, 102, 241, 0.30),
+    0 0 34px -8px rgba(99, 102, 241, 0.55),
+    0 22px 48px -26px rgba(0, 0, 0, 0.95);
+}
+
+/* ------------------------------------------------------------
+   3. TYPOGRAPHY & ACCENT COLOR
+   ------------------------------------------------------------ */
+.text-aurora {
+  color: #a5b4fc; /* solid indigo-300 — no gradient */
+}
+
+/* Solid white title with an animated aurora glow instead of a gradient sweep */
+.text-shimmer {
+  color: #f8fafc;
+  animation: text-glow 5s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------
+   4. BUTTONS — solid color fill + sheen sweep
+   ------------------------------------------------------------ */
+.btn-liquid {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: var(--solid-indigo);
+  box-shadow: 0 10px 26px -14px rgba(79, 70, 229, 0.95);
+  transition: background-color 0.3s ease, box-shadow 0.35s ease, transform 0.25s ease;
+}
+
+.btn-liquid:hover:not(:disabled) {
+  background-color: var(--solid-indigo-hi);
+  box-shadow: 0 16px 34px -14px rgba(99, 102, 241, 1);
+  transform: translateY(-1px);
+}
+
+.btn-liquid:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-liquid::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.55s ease;
+  pointer-events: none;
+}
+
+.btn-liquid:hover:not(:disabled)::after {
+  left: 130%;
+}
+
+/* Solid emerald action (used where a primary indigo would clash) */
+.btn-emerald {
+  background-color: var(--solid-emerald);
+  box-shadow: 0 10px 26px -14px rgba(5, 150, 105, 0.95);
+}
+
+.btn-emerald:hover:not(:disabled) {
+  background-color: var(--solid-emerald-hi);
+  box-shadow: 0 16px 34px -14px rgba(16, 185, 129, 1);
+}
+
+/* Solid violet action */
+.btn-violet {
+  background-color: var(--solid-violet);
+  box-shadow: 0 10px 26px -14px rgba(124, 58, 237, 0.95);
+}
+
+.btn-violet:hover:not(:disabled) {
+  background-color: #8b5cf6;
+  box-shadow: 0 16px 34px -14px rgba(139, 92, 246, 1);
+}
+
+/* Quiet ghost button */
+.btn-ghost {
+  transition: background-color 0.25s ease, color 0.25s ease, transform 0.25s ease;
+}
+
+.btn-ghost:hover {
+  background-color: var(--surface-3);
+}
+
+/* ------------------------------------------------------------
+   5. SOFT 3D ACCENT — floating glass cube
+   ------------------------------------------------------------ */
+.cube-scene {
+  width: 118px;
+  height: 118px;
+  perspective: 760px;
+}
+
+.cube-float {
+  width: 100%;
+  height: 100%;
+  animation: gentle-float 7s ease-in-out infinite;
+}
+
+.cube {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: cube-turn 26s linear infinite;
+}
+
+.cube__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background-color: rgba(79, 70, 229, 0.34); /* solid indigo, kept translucent only for 3D depth */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 0 24px rgba(165, 243, 252, 0.16);
+}
+
+.cube__face--front  { transform: translateZ(59px); }
+.cube__face--back   { transform: rotateY(180deg) translateZ(59px); }
+.cube__face--right  { transform: rotateY(90deg) translateZ(59px); }
+.cube__face--left   { transform: rotateY(-90deg) translateZ(59px); }
+.cube__face--top    { transform: rotateX(90deg) translateZ(59px); }
+.cube__face--bottom { transform: rotateX(-90deg) translateZ(59px); }
+
+/* ------------------------------------------------------------
+   6. TILT (micro-parallax, pointer driven)
+   ------------------------------------------------------------ */
+.tilt {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.tilt.is-tilting {
+  transition: transform 0.12s linear;
+}
+
+.tilt-glare::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    340px circle at var(--glare-x, 50%) var(--glare-y, 50%),
+    rgba(255, 255, 255, 0.09),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.tilt.is-tilting.tilt-glare::after,
+.tilt-glare:hover::after {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------
+   7. MICRO-INTERACTIONS
+   ------------------------------------------------------------ */
+/* Lift on hover for interactive cards */
+.lift {
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.lift:hover {
+  transform: translateY(-3px);
+  border-color: rgba(129, 140, 248, 0.42);
+  box-shadow: 0 24px 46px -28px rgba(79, 70, 229, 0.85);
+}
+
+/* Live status dot */
+.live-dot {
+  position: relative;
+}
+
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 1px solid rgba(52, 211, 153, 0.6);
+  animation: ripple 2.4s ease-out infinite;
+}
+
+/* Dashed drop-zone: solid navy well + soft flowing grid + aurora glow */
+.drop-liquid {
+  position: relative;
+  background-color: var(--surface-4);
+  background-image:
+    radial-gradient(130% 120% at 50% 0%, rgba(99, 102, 241, 0.16), transparent 62%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px, 30px 30px;
+  background-position: 0 0, 0 0, 0 0;
+  transition: box-shadow 0.35s ease, border-color 0.35s ease, background-color 0.35s ease;
+  animation: grid-pan 26s linear infinite;
+}
+
+.drop-liquid:hover {
+  background-color: #131a35;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.55), 0 24px 50px -34px rgba(99, 102, 241, 1);
+}
+
+/* Relevance meter fill */
+.meter-fill {
+  transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ------------------------------------------------------------
+   8. ENTRANCE MOTION (restrained)
+   ------------------------------------------------------------ */
+.fade-up {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fade-up 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.fade-in {
+  opacity: 0;
+  animation: fade-in 0.6s ease forwards;
+}
+
+.delay-1 { animation-delay: 0.06s; }
+.delay-2 { animation-delay: 0.12s; }
+.delay-3 { animation-delay: 0.18s; }
+.delay-4 { animation-delay: 0.24s; }
+
+/* ------------------------------------------------------------
+   9. LOADING DOTS (liquid)
+   ------------------------------------------------------------ */
+.liquid-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: #6366f1; /* solid */
+  animation: dot-wave 1.3s ease-in-out infinite;
+}
+.liquid-dot:nth-child(2) { animation-delay: 0.16s; }
+.liquid-dot:nth-child(3) { animation-delay: 0.32s; }
+
+/* ------------------------------------------------------------
+   10. SCROLLBARS
+   ------------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #4f46e5;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #6366f1;
+  background-clip: padding-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.5) transparent;
+}
+
+/* Legacy aliases kept so any untouched markup still renders correctly */
 .glow-blue {
-  box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.35);
 }
 
 .glow-emerald {
   box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.3);
+}
+
+} /* end @layer components */
+
+/* ------------------------------------------------------------
+   11. KEYFRAMES
+   ------------------------------------------------------------ */
+@keyframes liquid-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  33%  { transform: translate3d(4vw, -3vh, 0) scale(1.08); }
+  66%  { transform: translate3d(-3vw, 4vh, 0) scale(0.95); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes shimmer-sweep {
+  0%   { background-position: 120% 0; }
+  50%  { background-position: -20% 0; }
+  100% { background-position: 120% 0; }
+}
+
+@keyframes text-glow {
+  0%, 100% { text-shadow: 0 0 16px rgba(165, 243, 252, 0.25); }
+  50%      { text-shadow: 0 0 26px rgba(129, 140, 248, 0.6); }
+}
+
+@keyframes gentle-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+
+@keyframes cube-turn {
+  from { transform: rotateX(-16deg) rotateY(0deg); }
+  to   { transform: rotateX(-16deg) rotateY(360deg); }
+}
+
+@keyframes ripple {
+  0%   { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+@keyframes fade-up {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  to { opacity: 1; }
+}
+
+@keyframes dot-wave {
+  0%, 100% { transform: translateY(0); opacity: 0.55; }
+  50%      { transform: translateY(-5px); opacity: 1; }
+}
+
+@keyframes grid-pan {
+  to { background-position: 0 0, 30px 30px, 30px 30px; }
+}
+
+/* ------------------------------------------------------------
+   12. REDUCED MOTION
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .fade-up,
+  .fade-in {
+    opacity: 1;
+    transform: none;
+  }
 }

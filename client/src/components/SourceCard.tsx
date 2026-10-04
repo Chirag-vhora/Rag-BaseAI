@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SourceReference } from '../types';
-import { FileText, Shield, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface SourceCardProps {
   source: SourceReference;
@@ -10,18 +10,22 @@ interface SourceCardProps {
 export const SourceCard: React.FC<SourceCardProps> = ({ source, index }) => {
   const [expanded, setExpanded] = useState(false);
 
-  const relevanceColor =
+  const scorePercent = Math.round(source.score * 100);
+
+  const relevanceTone =
     source.score >= 0.5
-      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+      ? { chip: 'bg-[#064e3b] text-emerald-50 border-[#10b981]/50', bar: '#10b981' }
       : source.score >= 0.25
-      ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-      : 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+      ? { chip: 'bg-[#155e75] text-cyan-50 border-[#22d3ee]/50', bar: '#22d3ee' }
+      : { chip: 'bg-[#78350f] text-amber-50 border-[#f59e0b]/50', bar: '#f59e0b' };
 
   return (
-    <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-3 text-xs transition-all hover:border-slate-700">
-      <div className="flex items-center justify-between gap-2">
+    <div className="glass-card rounded-xl p-3 text-xs transition-all duration-300 hover:border-indigo-400/40 hover:shadow-[0_16px_34px_-24px_rgba(99,102,241,0.9)]">
+      <div className="relative z-10 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 overflow-hidden">
-          <FileText className="h-4 w-4 text-blue-400 shrink-0" />
+          <span className="h-6 w-6 shrink-0 rounded-lg flex items-center justify-center bg-[#312e81] border border-[#6366f1]/50 text-indigo-100">
+            <FileText className="h-3.5 w-3.5" />
+          </span>
           <span className="font-semibold text-slate-200 truncate" title={source.documentName}>
             [{index + 1}] {source.documentName}
           </span>
@@ -29,23 +33,36 @@ export const SourceCard: React.FC<SourceCardProps> = ({ source, index }) => {
 
         <div className="flex items-center gap-2 shrink-0">
           {source.roleAccess === 'hr_admin' && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 font-medium">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] bg-[#4c1d95] text-violet-50 border border-[#8b5cf6]/50 font-medium">
               <Shield className="h-3 w-3" /> HR Restricted
             </span>
           )}
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${relevanceColor}`}>
-            {Math.round(source.score * 100)}% match
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border tabular-nums ${relevanceTone.chip}`}>
+            {scorePercent}% match
           </span>
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200"
+            className="p-1 hover:bg-[#1b2140] rounded text-slate-400 hover:text-white transition-colors"
+            aria-label={expanded ? 'Collapse source excerpt' : 'Expand source excerpt'}
           >
             {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>
 
-      <div className={`mt-2 text-slate-300 leading-relaxed font-mono bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 text-[11px] whitespace-pre-wrap ${!expanded ? 'line-clamp-2' : ''}`}>
+      {/* Relevance meter */}
+      <div className="relative z-10 mt-2.5 h-1 rounded-full bg-[#090c1a] overflow-hidden">
+        <div
+          className="meter-fill h-full rounded-full"
+          style={{ width: `${Math.max(scorePercent, 3)}%`, backgroundColor: relevanceTone.bar }}
+        />
+      </div>
+
+      <div
+        className={`relative z-10 mt-2.5 text-slate-300 leading-relaxed font-mono bg-[#090c1a] p-2.5 rounded-lg border border-white/10 text-[11px] whitespace-pre-wrap ${
+          !expanded ? 'line-clamp-2' : ''
+        }`}
+      >
         {source.chunkSnippet}
       </div>
     </div>

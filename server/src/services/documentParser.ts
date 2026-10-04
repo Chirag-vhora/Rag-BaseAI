@@ -10,7 +10,11 @@ export async function extractTextFromBuffer(
 
   try {
     if (mimeType === 'application/pdf' || extension === 'pdf') {
-      const data = await pdfParse(buffer);
+      // pdf.js 1.10 (pdf-parse) mis-reads Node's *pooled* Buffers for files < 8 KB
+      // (it uses the underlying ArrayBuffer and ignores byteOffset → "bad XRef entry").
+      // Copying into a plain Uint8Array gives it a fresh, offset-0 ArrayBuffer.
+      // (pdf-parse's typings ask for Buffer; runtime accepts any typed array.)
+      const data = await pdfParse(new Uint8Array(buffer) as unknown as Buffer);
       return data.text;
     }
 

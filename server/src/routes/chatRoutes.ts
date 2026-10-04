@@ -68,7 +68,8 @@ router.post('/', async (req: Request, res: Response) => {
       content: ragResult.answer,
       timestamp: new Date().toISOString(),
       sources: ragResult.sources,
-      isUngrounded: ragResult.isUngrounded
+      isUngrounded: ragResult.isUngrounded,
+      fallbackNote: ragResult.fallbackNote
     };
     session.messages.push(assistantMsg);
     session.updatedAt = new Date().toISOString();

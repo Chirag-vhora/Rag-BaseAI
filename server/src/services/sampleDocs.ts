@@ -120,8 +120,9 @@ For confidential compensation disputes or severe policy violations, contact the 
 /**
  * Helper to seed sample company documents into vector store
  */
-export function seedSampleDocuments() {
+export function seedSampleDocuments(): { seeded: DocumentMetadata[]; chunks: any[] } {
   const seededDocs: DocumentMetadata[] = [];
+  const allChunks: any[] = [];
 
   for (const sample of SAMPLE_POLICIES) {
     // Check if doc already exists by name
@@ -153,7 +154,8 @@ export function seedSampleDocuments() {
     vectorStore.saveDocumentMetadata(docMeta);
     vectorStore.addChunks(chunks);
     seededDocs.push(docMeta);
+    allChunks.push(...chunks);
   }
 
-  return seededDocs;
+  return { seeded: seededDocs, chunks: allChunks };
 }
