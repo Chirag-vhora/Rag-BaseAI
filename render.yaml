@@ -1,0 +1,32 @@
+# Render blueprint — creates the web service with one click:
+#   Render Dashboard → New → Blueprint → pick this repo
+#
+# Everything the app needs at runtime:
+#   * one service serves BOTH the React UI and the /api backend (see server/src/index.ts)
+#   * the vector DB lives in Pinecone's cloud, so no database is needed here
+#   * Render's free plan has an ephemeral disk — the app re-imports its
+#     document list from Pinecone on every boot (see syncVectorStores())
+services:
+  - type: web
+    name: nexushr-rag-assistant
+    runtime: node
+    plan: free
+    # install root deps, then install + build the React client
+    buildCommand: npm install && npm run build
+    # tsx runs the TypeScript server directly (kept in "dependencies")
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # real index name — dimension must be 768 (gemini-embedding-2)
+      - key: PINECONE_INDEX
+        value: rag-system
+      # secrets: paste these in the Render dashboard after the blueprint runs
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false

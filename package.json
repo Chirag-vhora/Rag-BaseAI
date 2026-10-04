@@ -5,9 +5,14 @@
   "main": "server/src/index.ts",
   "scripts": {
     "server": "tsx server/src/index.ts",
+    "start": "tsx server/src/index.ts",
     "server:dev": "nodemon --watch server/src --exec tsx server/src/index.ts",
     "client": "npm --prefix client run dev",
+    "build": "cd client && npm install --include=dev && npm run build",
     "dev": "npx --package concurrently concurrently \"npm run server\" \"npm run client\""
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@pinecone-database/pinecone": "^9.0.0",
@@ -17,6 +22,7 @@
     "mammoth": "^1.9.0",
     "multer": "^1.4.5-lts.1",
     "pdf-parse": "^1.1.1",
+    "tsx": "^4.19.3",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
@@ -28,7 +34,6 @@
     "@types/uuid": "^10.0.0",
     "concurrently": "^9.2.4",
     "nodemon": "^3.1.9",
-    "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
 }

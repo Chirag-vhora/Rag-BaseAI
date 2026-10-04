@@ -16,9 +16,14 @@ const upload = multer({
 });
 
 /**
- * Helper — upsert chunks to Pinecone if configured
+ * Helper — upsert chunks to Pinecone if configured.
+ * `ownerDocs` carries the document file metadata so it round-trips back into
+ * the store if the local process state is ever lost.
  */
-async function tryUpsertToPinecone(chunks: any[]): Promise<void> {
+async function tryUpsertToPinecone(
+  chunks: any[],
+  ownerDocs: DocumentMetadata[] = []
+): Promise<void> {
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!pineconeStore.isConfigured() || !geminiKey) {
@@ -29,7 +34,7 @@ async function tryUpsertToPinecone(chunks: any[]): Promise<void> {
 
   const texts = chunks.map((c) => c.content);
   const embeddings = await getBatchGeminiEmbeddings(texts, geminiKey);
-  await pineconeStore.upsertChunks(chunks, embeddings);
+  await pineconeStore.upsertChunks(chunks, embeddings, ownerDocs);
   console.log(`🌲 Upserted ${chunks.length} chunks to Pinecone`);
 }
 
@@ -102,7 +107,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 
     // If Pinecone is configured, generate Gemini embeddings and upsert
     try {
-      await tryUpsertToPinecone(chunks);
+      await tryUpsertToPinecone(chunks, [docMeta]);
     } catch (embeddingErr) {
       console.warn('Pinecone upsert failed (will serve from local TF-IDF store):', embeddingErr);
     }
@@ -139,7 +144,7 @@ router.post('/seed', async (req: Request, res: Response) => {
     // Upsert seeded chunks to Pinecone if configured
     if (chunks.length > 0) {
       try {
-        await tryUpsertToPinecone(chunks);
+        await tryUpsertToPinecone(chunks, seeded);
       } catch (err) {
         console.warn('Pinecone upsert for seed docs failed:', err);
       }

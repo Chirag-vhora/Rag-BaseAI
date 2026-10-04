@@ -111,4 +111,55 @@ Built as part of the **AI HR Assistant Technical Assessment**.
 
 - **Frontend**: Vite, React 18, TypeScript, Tailwind CSS, Lucide Icons
 - **Backend**: Node.js, Express, TypeScript, Multer, pdf-parse, mammoth
-- **RAG & Vector Store**: Custom TF-IDF/BM25 Vector Similarity Engine with Role-Access Metadata filtering
+- **RAG & Vector Store**: Pinecone serverless index (768-dim) + Google `gemini-embedding-2`, with a local TF-IDF cosine fallback when embeddings/Pinecone are unavailable
+- **LLM**: Google `gemini-3.5-flash-lite` (primary) → Mistral `ministral-14b-latest` (fallback) → local grounded synthesizer (last resort)
+
+---
+
+## 🚀 Deployment — Render (one URL for UI + API)
+
+The Express server also serves the built React app (`client/dist`), so the whole
+product lives on **one URL** — no CORS or separate-host config needed. The
+frontend already calls the API with the relative path `/api`.
+
+### Option A — Blueprint (fastest)
+
+1. Push this repo to GitHub (the repo already contains `render.yaml`).
+2. Render Dashboard → **New → Blueprint** → select the repo.
+   Render reads `render.yaml` and creates the service (build, start, health check).
+3. In the new service's **Environment** tab, paste the 3 secrets
+   (`sync: false` in the blueprint):
+   | Variable | Value |
+   |---|---|
+   | `PINECONE_API_KEY` | from app.pinecone.io → API Keys |
+   | `GEMINI_API_KEY` | from aistudio.google.com/app/apikey |
+   | `MISTRAL_API_KEY` | from console.mistral.ai *(optional fallback)* |
+   `PINECONE_INDEX` is preset to `rag-system`.
+4. Deploy → open `https://<service>.onrender.com` — the UI loads from `/` and
+   the API answers at `/api/health`.
+
+### Option B — Manual web service
+
+| Setting | Value |
+|---|---|
+| Runtime | Node |
+| Build Command | `npm install && npm run build` |
+| Start Command | `npm start` |
+| Health Check Path | `/api/health` |
+
+### Why a restart doesn't lose your documents
+
+Render's **free plan has an ephemeral disk** (files are wiped on every
+restart/sleep), so the app treats **Pinecone as the source of truth**:
+
+- `data/vector-store.json` — local mirror (used on machines with a durable disk);
+- at boot, `syncVectorStores()` in `server/src/index.ts` **re-imports any document
+  that only exists in Pinecone** and **re-indexes any document Pinecone is
+  missing**, then logs `🌲 Pinecone sync OK`.
+
+Verify after a restart: `GET /api/health` → `stats.totalDocuments` should still
+show your full document list.
+
+> **Free plan caveat:** the service sleeps after ~15 min idle, so the first
+> request after idle takes 30–60s to wake up.
+

@@ -1,8 +1,77 @@
+import fs from 'fs';
+import path from 'path';
 import { VectorChunk, SearchResult, UserRole, DocumentMetadata } from '../types';
+
+/**
+ * Local store persistence.
+ *
+ * The in-memory store doubles as (a) the document list the UI renders and
+ * (b) the TF-IDF fallback when Pinecone/embeddings are unavailable. Writing it
+ * to disk keeps both across `npm run server` restarts on a machine with a
+ * durable filesystem (local dev, VPS, Render paid plan with a disk).
+ *
+ * NOTE: Render's *free* plan has an ephemeral filesystem, so on Render the
+ * authoritative copy lives in Pinecone and is re-imported at boot
+ * (see `pineconeStore.fetchAll()` + `restoreDocuments()` in `index.ts`).
+ */
+const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
+const PERSIST_FILE = path.join(DATA_DIR, 'vector-store.json');
+
+interface PersistedState {
+  version: number;
+  documents: DocumentMetadata[];
+  chunks: VectorChunk[];
+}
 
 class VectorStore {
   private chunks: VectorChunk[] = [];
   private documents: Map<string, DocumentMetadata> = new Map();
+  private persistScheduled = false;
+
+  constructor() {
+    this.loadFromDisk();
+  }
+
+  /**
+   * Restore documents + chunks previously written by `persist()`
+   */
+  private loadFromDisk(): void {
+    try {
+      if (!fs.existsSync(PERSIST_FILE)) return;
+      const state = JSON.parse(fs.readFileSync(PERSIST_FILE, 'utf8')) as PersistedState;
+      for (const doc of state.documents || []) {
+        if (doc && doc.id) this.documents.set(doc.id, doc);
+      }
+      this.chunks = (state.chunks || []).filter((c) => c && c.documentId);
+      if (this.documents.size > 0) {
+        console.log(`💾 Restored ${this.documents.size} documents & ${this.chunks.length} chunks from disk`);
+      }
+    } catch (err) {
+      console.warn('💾 Could not read persisted vector store:', (err as Error).message);
+    }
+  }
+
+  /**
+   * Coalesced (debounced to end-of-tick) write of the current state
+   */
+  private persist(): void {
+    if (this.persistScheduled) return;
+    this.persistScheduled = true;
+    setImmediate(() => {
+      this.persistScheduled = false;
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        const state: PersistedState = {
+          version: 1,
+          documents: Array.from(this.documents.values()),
+          chunks: this.chunks
+        };
+        fs.writeFileSync(PERSIST_FILE, JSON.stringify(state));
+      } catch (err) {
+        console.warn('💾 Persist failed (state stays in memory only):', (err as Error).message);
+      }
+    });
+  }
 
   /**
    * Helper to tokenize text for vector indexing and search
@@ -40,6 +109,7 @@ class VectorStore {
    */
   public addChunks(newChunks: VectorChunk[]): void {
     this.chunks.push(...newChunks);
+    this.persist();
   }
 
   /**
@@ -47,6 +117,34 @@ class VectorStore {
    */
   public saveDocumentMetadata(doc: DocumentMetadata): void {
     this.documents.set(doc.id, doc);
+    this.persist();
+  }
+
+  /**
+   * Import documents/chunks recovered from the vector database (boot-time
+   * rehydration). Documents already present locally are skipped so this is
+   * idempotent. Returns how many documents were restored.
+   */
+  public restoreDocuments(docs: DocumentMetadata[], remoteChunks: VectorChunk[]): number {
+    let restored = 0;
+    for (const doc of docs) {
+      if (!doc || this.documents.has(doc.id)) continue;
+      this.documents.set(doc.id, doc);
+      this.chunks.push(...remoteChunks.filter((c) => c.documentId === doc.id));
+      restored++;
+    }
+    if (restored > 0) {
+      console.log(`💾 Restored ${restored} document(s) from vector database`);
+      this.persist();
+    }
+    return restored;
+  }
+
+  /**
+   * All local chunks that belong to a document (used for boot-time re-sync)
+   */
+  public getChunksByDocument(documentId: string): VectorChunk[] {
+    return this.chunks.filter((c) => c.documentId === documentId);
   }
 
   /**
@@ -73,6 +171,7 @@ class VectorStore {
     this.chunks = this.chunks.filter((chunk) => chunk.documentId !== documentId);
     const deletedCount = initialCount - this.chunks.length;
     this.documents.delete(documentId);
+    this.persist();
     return deletedCount > 0;
   }
 

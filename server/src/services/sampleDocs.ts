@@ -1,9 +1,15 @@
-import { v4 as uuidv4 } from 'uuid';
 import { DocumentMetadata, UserRole } from '../types';
 import { chunkText } from './chunker';
 import { vectorStore } from './vectorStore';
 
 export interface SampleDoc {
+  /**
+   * Deterministic id. Sample docs MUST NOT use random UUIDs: the local store
+   * and Pinecone are keyed by documentId, and a restart that generated fresh
+   * ids would make UI deletes no-ops in Pinecone (orphaned vectors) and force
+   * a re-index on every boot.
+   */
+  id: string;
   name: string;
   category: 'leave' | 'attendance' | 'benefits' | 'compensation' | 'handbook' | 'general';
   targetRole: UserRole | 'all';
@@ -12,6 +18,7 @@ export interface SampleDoc {
 
 export const SAMPLE_POLICIES: SampleDoc[] = [
   {
+    id: 'sample-leave-holiday-policy-2026',
     name: 'Company Leave & Holiday Policy 2026.txt',
     category: 'leave',
     targetRole: 'all',
@@ -44,6 +51,7 @@ All leaves must be submitted through the internal HR Portal at least 3 days in a
 `.trim()
   },
   {
+    id: 'sample-attendance-wfh-policy',
     name: 'Attendance & Flexible Remote Work Policy.txt',
     category: 'attendance',
     targetRole: 'all',
@@ -66,6 +74,7 @@ Our standard workweek is 40 hours, Monday through Friday.
 `.trim()
   },
   {
+    id: 'sample-health-perks-benefits-2026',
     name: 'Employee Health & Perks Benefits Guide 2026.txt',
     category: 'benefits',
     targetRole: 'all',
@@ -88,6 +97,7 @@ Our standard workweek is 40 hours, Monday through Friday.
 `.trim()
   },
   {
+    id: 'sample-hr-compensation-guide',
     name: 'HR & Management Executive Compensation Guidelines.txt',
     category: 'compensation',
     targetRole: 'hr_admin', // RESTRICTED HR ADMIN DOCUMENT
@@ -128,10 +138,14 @@ export function seedSampleDocuments(): { seeded: DocumentMetadata[]; chunks: any
     // Check if doc already exists by name
     const existing = vectorStore.getAllDocuments().find((d) => d.name === sample.name);
     if (existing) {
-      continue;
+      // Already canonical → nothing to do (this is the normal boot path)
+      if (existing.id === sample.id) continue;
+      // Legacy copy created with a random UUID → replace it so ids stay in
+      // sync with what is already upserted in Pinecone.
+      vectorStore.deleteDocument(existing.id);
     }
 
-    const docId = uuidv4();
+    const docId = sample.id;
     const chunks = chunkText(docId, sample.name, sample.content, {
       roleAccess: sample.targetRole,
       category: sample.category,
