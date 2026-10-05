@@ -22,7 +22,30 @@ export interface RAGQueryResponse {
  */
 export async function processRAGQuery(options: RAGQueryOptions): Promise<RAGQueryResponse> {
   const { query, userRole } = options;
+  const history = options.history || [];
   const geminiKey = process.env.GEMINI_API_KEY;
+
+  // Conversation transcript handed to the LLM so follow-up questions such as
+  // "…and when am I eligible for that?" keep their referent.
+  // (chatRoutes pushes the current question before calling us, so `history`
+  //  already ends with the live question.)
+  const conversationText = history
+    .slice(-6)
+    .map((m) => `${m.role === 'user' ? 'Employee' : 'Assistant'}: ${m.content}`)
+    .join('\n');
+
+  const priorUserTurns = history
+    .slice(0, -1)
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content);
+
+  // Follow-ups are meaningless on their own — embed the previous turn together
+  // with the current question so vector search still targets the right policy.
+  const FOLLOW_UP_RE = /\b(that|this|those|these|it|they|then|same|again|also|too|what about|how about|and when|and how|and why|instead|rather)\b/i;
+  const searchQuery =
+    priorUserTurns.length > 0 && FOLLOW_UP_RE.test(query)
+      ? `${priorUserTurns[priorUserTurns.length - 1]}\n${query}`
+      : query;
 
   let searchResults: SearchResult[] = [];
 
@@ -30,15 +53,15 @@ export async function processRAGQuery(options: RAGQueryOptions): Promise<RAGQuer
   if (pineconeStore.isConfigured() && geminiKey) {
     try {
       console.log('🌲 Using Pinecone Real Vector Database + Gemini Embeddings...');
-      const queryEmbedding = await getGeminiEmbedding(query, geminiKey);
+      const queryEmbedding = await getGeminiEmbedding(searchQuery, geminiKey);
       searchResults = await pineconeStore.query(queryEmbedding, userRole, 4);
     } catch (err) {
       console.warn('Pinecone vector search failed, falling back to local TF-IDF store:', err);
-      searchResults = vectorStore.similaritySearch(query, userRole, 4);
+      searchResults = vectorStore.similaritySearch(searchQuery, userRole, 4);
     }
   } else {
     // Fallback to local store
-    searchResults = vectorStore.similaritySearch(query, userRole, 4);
+    searchResults = vectorStore.similaritySearch(searchQuery, userRole, 4);
   }
 
   // 2. Strict grounding check:
@@ -77,7 +100,7 @@ export async function processRAGQuery(options: RAGQueryOptions): Promise<RAGQuer
   // A. Google Gemini Integration (gemini-3.5-flash-lite)
   if (geminiKey) {
     try {
-      const geminiAnswer = await generateGeminiResponse(query, contextTexts, geminiKey);
+      const geminiAnswer = await generateGeminiResponse(query, contextTexts, geminiKey, conversationText);
       if (geminiAnswer) {
         return { answer: geminiAnswer, sources, isUngrounded: false };
       }
@@ -91,7 +114,7 @@ export async function processRAGQuery(options: RAGQueryOptions): Promise<RAGQuer
   // B. Mistral AI Integration (ministral-14b-latest — free-tier accessible, 30 req/min)
   if (mistralKey) {
     try {
-      const mistralAnswer = await generateMistralResponse(query, contextTexts, mistralKey);
+      const mistralAnswer = await generateMistralResponse(query, contextTexts, mistralKey, conversationText);
       if (mistralAnswer) {
         return { answer: mistralAnswer, sources, isUngrounded: false, fallbackNote: buildNote('Mistral') };
       }
@@ -105,7 +128,7 @@ export async function processRAGQuery(options: RAGQueryOptions): Promise<RAGQuer
   // C. OpenAI Integration (gpt-4o-mini)
   if (openAiKey) {
     try {
-      const llmAnswer = await generateOpenAIResponse(query, contextTexts, openAiKey);
+      const llmAnswer = await generateOpenAIResponse(query, contextTexts, openAiKey, conversationText);
       if (llmAnswer) {
         return { answer: llmAnswer, sources, isUngrounded: false, fallbackNote: buildNote('OpenAI') };
       }
@@ -150,9 +173,18 @@ ${formattedPassages}`;
 /**
  * Google Gemini API Caller (gemini-3.5-flash-lite)
  */
-async function generateGeminiResponse(query: string, contextChunks: string[], apiKey: string): Promise<string | null> {
+async function generateGeminiResponse(
+  query: string,
+  contextChunks: string[],
+  apiKey: string,
+  conversation: string = ''
+): Promise<string | null> {
   const promptText = `You are an AI HR Assistant for an enterprise company. Answer employee questions using ONLY the provided document context below. If the answer cannot be found in the context, explicitly say "I could not find information regarding this in the company documents." Do NOT hallucinate.
-
+${
+  conversation
+    ? `\nCONVERSATION SO FAR (use it to resolve follow-ups like "that" or "the same one"; the current question is the last line):\n${conversation}\n`
+    : ''
+}
 DOCUMENT CONTEXT:
 ${contextChunks.join('\n\n---\n\n')}
 
@@ -181,7 +213,12 @@ ${query}`;
  * x-ratelimit-limit-req-minute: 0 for it (429 code 1300). Ministral 14B is
  * free-tier accessible and strong enough for grounded HR answers.
  */
-async function generateMistralResponse(query: string, contextChunks: string[], apiKey: string): Promise<string | null> {
+async function generateMistralResponse(
+  query: string,
+  contextChunks: string[],
+  apiKey: string,
+  conversation: string = ''
+): Promise<string | null> {
   const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -193,7 +230,11 @@ async function generateMistralResponse(query: string, contextChunks: string[], a
       messages: [
         {
           role: 'system',
-          content: `You are an AI HR Assistant for an enterprise company. Answer employee questions using ONLY the provided document context below. If the answer cannot be found in the context, explicitly say "I could not find information regarding this in the company documents." Do NOT hallucinate.\n\nDOCUMENT CONTEXT:\n${contextChunks.join('\n\n---\n\n')}`
+          content: `You are an AI HR Assistant for an enterprise company. Answer employee questions using ONLY the provided document context below. If the answer cannot be found in the context, explicitly say "I could not find information regarding this in the company documents." Do NOT hallucinate.${
+            conversation
+              ? `\n\nCONVERSATION SO FAR (use it to resolve follow-ups like "that"; the current question is the last line):\n${conversation}`
+              : ''
+          }\n\nDOCUMENT CONTEXT:\n${contextChunks.join('\n\n---\n\n')}`
         },
         {
           role: 'user',
@@ -215,7 +256,12 @@ async function generateMistralResponse(query: string, contextChunks: string[], a
 /**
  * OpenAI API Caller
  */
-async function generateOpenAIResponse(query: string, contextChunks: string[], apiKey: string): Promise<string | null> {
+async function generateOpenAIResponse(
+  query: string,
+  contextChunks: string[],
+  apiKey: string,
+  conversation: string = ''
+): Promise<string | null> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -227,7 +273,11 @@ async function generateOpenAIResponse(query: string, contextChunks: string[], ap
       messages: [
         {
           role: 'system',
-          content: `You are an AI HR Assistant for an enterprise company. Answer employee questions using ONLY the provided document context below. If the answer cannot be found in the context, explicitly say "I could not find information regarding this in the company documents." Do NOT hallucinate.\n\nDOCUMENT CONTEXT:\n${contextChunks.join('\n\n---\n\n')}`
+          content: `You are an AI HR Assistant for an enterprise company. Answer employee questions using ONLY the provided document context below. If the answer cannot be found in the context, explicitly say "I could not find information regarding this in the company documents." Do NOT hallucinate.${
+            conversation
+              ? `\n\nCONVERSATION SO FAR (use it to resolve follow-ups like "that"; the current question is the last line):\n${conversation}`
+              : ''
+          }\n\nDOCUMENT CONTEXT:\n${contextChunks.join('\n\n---\n\n')}`
         },
         {
           role: 'user',
